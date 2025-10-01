@@ -13,7 +13,7 @@ pip install .
 ### Running Extract10xCellRangerErrors
 --------------------------------------
 ```bash
-extractwarninganderrors -indir="/directory/where/multiple/CellrangerMulti/runs/are/located/" -outdir="./"
+Extract10xCellRangerErrors -indir="/directory/where/multiple/CellrangerMulti/runs/are/located/" -outdir="./"
 ```
 
 ### Output files
