@@ -2,6 +2,8 @@ import argparse
 import re
 from bs4 import BeautifulSoup
 import os
+librarytmp=[]
+
 
 def parse_websummary_file(htmlfile, args, fout_library_error, fout_sample_error):
     '''parse through websummary.html file for Multi VDJ and GEX data '''
@@ -119,13 +121,14 @@ def read_in_web_summary_file(args):
         else:
             # print(str(d)+" outs directory does not exist skipping")
             pass
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Generate table of Cellranger errors for pooled libraries and samples with VDJ and GEX data")
     parser.add_argument("-indir", "--input_directory", type=str, help="input directory where cellranger runs are stored")
     parser.add_argument("-outdir", "--output_directory",default="./", type=str, help="output directory where cellranger runs are stored")
     parser.add_argument("-tmp_file", "--tmp_removal", action="store_false", help="Keep tmp files")
 
     args = parser.parse_args()
-    librarytmp=[]
     read_in_web_summary_file(args)
+
+if __name__ == "__main__":
+    main()

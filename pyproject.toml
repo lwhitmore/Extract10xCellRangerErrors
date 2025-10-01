@@ -17,3 +17,5 @@ dependencies = [
   "bs4",
 ]
 
+[project.scripts]
+Extract10xCellRangerErrors = "Ex10xErrors:main"
