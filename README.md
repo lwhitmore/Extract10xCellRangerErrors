@@ -7,7 +7,7 @@ The goal of this program is to extract 10x warnings and errors into a table in a
 ```bash
 git clone https://github.com/lwhitmore/Extract10xCellRangerErrors.git
 cd Extract10xCellRangerErrors
-python setup.py install
+pip install . 
 ```
 
 ### Running Extract10xCellRangerErrors
