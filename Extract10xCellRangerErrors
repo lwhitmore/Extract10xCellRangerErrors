@@ -1,0 +1,131 @@
+import argparse
+import re
+from bs4 import BeautifulSoup
+import os
+
+def parse_websummary_file(htmlfile, args, fout_library_error, fout_sample_error):
+    '''parse through websummary.html file for Multi VDJ and GEX data '''
+    with open(htmlfile, 'r', encoding='utf-8') as fp:
+        html_content = fp.read()
+    soup = BeautifulSoup(html_content, 'html.parser')
+    div = soup.find('script')
+    errordict = {}
+    datastring = div.get_text()
+    datastring = datastring.strip()
+    if (datastring!=""):
+        counter=0
+        matchrunid = re.search(r"\"Run ID\"\:\".*?\"", datastring)
+        tmpout=open(os.path.join(args.output_directory, "tmp_"+re.sub("\"","", matchrunid.group())+".txt"), 'w')
+        tmpout.write(re.sub("\"","", matchrunid.group())+"\n")
+        matchid = re.search(r"\"id\"\:\".*?\"", datastring)
+        tmpout.write("Sample "+re.sub("\"","", matchid.group())+"\n")
+        matchesiter = re.finditer(r"\"alerts\"\:\[{\"level\"\:\"\w+\"\,.*?}\]", datastring)
+        for m in matchesiter:
+            counter = counter+1
+            errordict[m.start()] = m.group()
+        matches2iter = re.finditer(r"\"\w+\_tab\"\:\{\"content\"",datastring)
+        counter=0
+        temp =[]
+        for m in matches2iter:
+            value = re.sub(r"\:\{\"content\"", "", m.group())
+            counter = counter+1
+            if value in temp:
+                errordict[m.start()] = "\"individual_sample_"+re.sub("^\"", "", value)
+            else:
+                errordict[m.start()] = value
+            temp.append(value)
+    
+        for key in sorted(errordict.keys()):
+            value = errordict[key]
+            tmpout.write(f"{key}\t{value}\n")
+        tmpout.close()
+    else:
+        raise ValueError("Could not correctly parse through html, likely html is not from a multi run including VDJ and gene expression data ")
+
+    with open(os.path.join(args.output_directory, "tmp_"+re.sub("\"","", matchrunid.group())+".txt"), 'r') as fin:
+        lines=fin.readlines()
+        runid = lines[0].strip()
+        sampleid = lines[1].strip()
+        for line in lines[2:len(lines)]:
+            line = line.strip()
+            line = re.sub(r"\"", "", line)
+            larray=line.split("\t")
+            if re.search(r"\_tab",larray[1]):
+                if re.search("individual_sample", larray[1] ):
+                    finalstringorig=sampleid+"\t"
+                else:
+                    finalstringorig=runid+"\t"
+                finalstring=finalstringorig+re.sub(r"\_tab", "", larray[1])+" library errors:\t"
+                linecounter=0
+            elif re.search(r"alerts",larray[1]):
+                linecounter=linecounter+1
+                if linecounter < 2:
+                    larray[1] =  re.sub(r"\[|\]", "", larray[1])
+                    larray[1] =  re.sub(r"alerts\:", "", larray[1])
+
+                    alertsarray = larray[1].split("},{")
+                    counter=0
+                    for a in alertsarray:
+                        a = re.sub(r"{level\:","", a)
+                        a = re.sub(r"level\:","", a)
+                        a = re.sub(r",formatted_value\:"," ", a)
+                        a = re.sub(r",title","", a)
+                        a = re.sub(r",message\:.*$","", a)
+                        if counter ==0:
+                            finalstring=finalstring+a+"\n"
+                        else:
+                            finalstring=finalstring+"\t\t"+a+"\n"
+                        counter=counter+1
+                    if re.search("individual_sample", finalstring ):
+                        fout_sample_error.write(finalstring)
+                        finalstringorig=sampleid+"\t"
+                    else:
+                        finalstringorig=runid+"\t"
+                        if runid not in librarytmp:
+                            fout_library_error.write(finalstring)
+                        else:
+                            # print(runid+" already added to file")
+                            pass
+                else:
+                    pass
+        librarytmp.append(runid)
+    if args.tmp_removal:
+        os.remove(os.path.join(args.output_directory, "tmp_"+re.sub("\"","", matchrunid.group())+".txt"))
+    else:
+        pass
+
+def read_in_web_summary_file(args):
+    '''load in cellranger runs '''
+    directories = [
+        entry
+        for entry in os.listdir(args.input_directory)
+        if os.path.isdir(os.path.join(args.input_directory, entry))
+    ]
+    fout_library_error = open(os.path.join(args.output_directory, "libraryerrortable.txt"), "w") 
+    fout_sample_error = open(os.path.join(args.output_directory, "samplerrortable.txt"), "w") 
+
+    '''load in individual web summary htmls for each sample'''
+    for d in directories:
+        if os.path.isdir(os.path.join(args.input_directory,d,"outs")):
+            directory = os.path.join(args.input_directory,d,"outs","per_sample_outs")
+            sample_directories = [
+                entry
+                for entry in os.listdir(directory)
+                if os.path.isdir(os.path.join(directory, entry))
+            ]
+            for s in sample_directories:
+                websummaryfile = os.path.join(args.input_directory,d,"outs","per_sample_outs",s, "web_summary.html")
+                parse_websummary_file(websummaryfile, args, fout_library_error, fout_sample_error)
+        else:
+            # print(str(d)+" outs directory does not exist skipping")
+            pass
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate table of Cellranger errors for pooled libraries and samples with VDJ and GEX data")
+    parser.add_argument("-indir", "--input_directory", type=str, help="input directory where cellranger runs are stored")
+    parser.add_argument("-outdir", "--output_directory",default="./", type=str, help="output directory where cellranger runs are stored")
+    parser.add_argument("-tmp_file", "--tmp_removal", action="store_false", help="Keep tmp files")
+
+    args = parser.parse_args()
+    librarytmp=[]
+    read_in_web_summary_file(args)
