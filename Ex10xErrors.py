@@ -1,3 +1,4 @@
+
 import argparse
 import re
 from bs4 import BeautifulSoup
@@ -67,27 +68,33 @@ def parse_websummary_file(htmlfile, args, fout_library_error, fout_sample_error)
 
                     alertsarray = larray[1].split("},{")
                     counter=0
+                    errorstmp = []
                     for a in alertsarray:
                         a = re.sub(r"{level\:","", a)
                         a = re.sub(r"level\:","", a)
                         a = re.sub(r",formatted_value\:"," ", a)
                         a = re.sub(r",title","", a)
                         a = re.sub(r",message\:.*$","", a)
-                        if counter ==0:
-                            finalstring=finalstring+a+"\n"
+                        if args.skip_multiplex_error:
+                            if a=="WARN:Unsupported multiplexing tag used ":
+                                pass 
+                            else:
+                                errorstmp.append(a)
                         else:
-                            finalstring=finalstring+"\t\t"+a+"\n"
-                        counter=counter+1
-                    if re.search("individual_sample", finalstring ):
-                        fout_sample_error.write(finalstring)
-                        finalstringorig=sampleid+"\t"
+                            errorstmp.append(a)
+                    if len(errorstmp) >= 1:
+                        if re.search("individual_sample", finalstring ):
+                            fout_sample_error.write(finalstring+",".join(errorstmp)+"\n")
+                            finalstringorig=sampleid+"\t"
+                        else:
+                            finalstringorig=runid+"\t"
+                            if runid not in librarytmp:
+                                fout_library_error.write(finalstring+",".join(errorstmp)+"\n")
+                            else:
+                                # print(runid+" already added to file")
+                                pass
                     else:
-                        finalstringorig=runid+"\t"
-                        if runid not in librarytmp:
-                            fout_library_error.write(finalstring)
-                        else:
-                            # print(runid+" already added to file")
-                            pass
+                        pass
                 else:
                     pass
         librarytmp.append(runid)
@@ -126,6 +133,7 @@ def main():
     parser.add_argument("-indir", "--input_directory", type=str, help="input directory where cellranger runs are stored")
     parser.add_argument("-outdir", "--output_directory",default="./", type=str, help="output directory where cellranger runs are stored")
     parser.add_argument("-tmp_file", "--tmp_removal", action="store_false", help="Keep tmp files")
+    parser.add_argument("-skipMulti", "--skip_multiplex_error", action="store_true", help="Don't report error WARN:Unsupported multiplexing tag used ")
 
     args = parser.parse_args()
     read_in_web_summary_file(args)
